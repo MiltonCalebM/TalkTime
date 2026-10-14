@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Stopwatch Video</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    --bg: #EDF0F3; --surface: #FFFFFF; --ink: #12161B; --muted: #55606C; --line: #D3D9E0;
+    --accent: #2457E6; --accent-ink: #FFFFFF;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0F1216; --surface: #171B21; --ink: #E9EDF1; --muted: #98A3AF; --line: #2A313A;
+      --accent: #7AA2FF; --accent-ink: #0B1020;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0F1216; --surface: #171B21; --ink: #E9EDF1; --muted: #98A3AF; --line: #2A313A;
+    --accent: #7AA2FF; --accent-ink: #0B1020;
+  }
+  html { scroll-padding-top: env(safe-area-inset-top, 0px); height: 100%; }
+  *, *::before, *::after { box-sizing: inherit; }
+  body {
+    margin: 0; min-height: 100%; background: var(--bg); color: var(--ink);
+    font-family: "Barlow", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 1rem; line-height: 1.5; -webkit-text-size-adjust: 100%;
+  }
+  .app { max-width: 960px; margin: 0 auto;
+    padding: 1.25rem max(1rem, env(safe-area-inset-left, 0px)) 2.5rem max(1rem, env(safe-area-inset-right, 0px)); }
+  h1 { font-family: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif; font-weight: 600;
+    font-size: 2.1rem; line-height: 1.1; margin: 0; letter-spacing: 0.01em; }
+  .sub { margin: 0.25rem 0 1rem; color: var(--muted); max-width: 60ch; }
+
+  .stage { position: relative; background: #000; border-radius: 14px; overflow: hidden;
+    width: min(100%, calc(60vh * 1.7778)); aspect-ratio: 16 / 9; margin: 0 auto; }
+  .stage:fullscreen, .stage:-webkit-full-screen { width: 100%; height: 100%; aspect-ratio: auto; border-radius: 0; }
+  #screen { width: 100%; height: 100%; object-fit: contain; display: block; background: #000; cursor: pointer; }
+
+  .dock { display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: center; margin-top: 0.9rem; }
+  .btn { height: 48px; padding: 0 1.2rem; font: inherit; font-weight: 600; cursor: pointer; color: var(--ink);
+    background: var(--surface); border: 1px solid var(--line); border-radius: 8px; -webkit-tap-highlight-color: transparent; }
+  .btn:hover { border-color: var(--muted); }
+  .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); min-width: 7.5rem; }
+  .btn.on { border-color: var(--accent); }
+  .btn:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .box { background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+    padding: 1rem 1.1rem 1.1rem; margin: 1.1rem auto 0; max-width: 520px; }
+  h2 { font-family: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif; font-weight: 600;
+    font-size: 1.3rem; margin: 0 0 0.6rem; line-height: 1.2; }
+  .row { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+  input[type="number"] { height: 48px; width: 5.4rem; padding: 0 0.6rem; font: inherit; font-size: 1.15rem;
+    text-align: center; font-variant-numeric: tabular-nums; color: var(--ink); background: var(--bg);
+    border: 1px solid var(--line); border-radius: 8px; }
+  .sep { color: var(--muted); font-weight: 600; }
+  .hint { font-size: 0.9rem; color: var(--muted); margin: 0.5rem 0 0; }
+  .head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 0.7rem; }
+  .head h2 { margin: 0; }
+  .switch { position: relative; width: 60px; height: 36px; border-radius: 18px; border: 1px solid var(--line);
+    background: var(--bg); cursor: pointer; padding: 0; flex: none; -webkit-tap-highlight-color: transparent; }
+  .switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 28px; height: 28px; border-radius: 50%;
+    background: var(--muted); transition: transform 0.15s, background 0.15s; }
+  .switch[aria-checked="true"] { background: var(--accent); border-color: var(--accent); }
+  .switch[aria-checked="true"]::after { transform: translateX(24px); background: var(--accent-ink); }
+  .switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  #redFields.off { opacity: 0.45; }
+  .note { color: var(--muted); font-size: 0.9rem; margin: 1rem auto 0; max-width: 520px; text-align: center; }
+
+  .toast { position: fixed; left: 50%; transform: translateX(-50%) translateY(0.5rem);
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 1rem); background: var(--ink); color: var(--bg);
+    padding: 0.65rem 1rem; border-radius: 10px; max-width: min(92vw, 520px); opacity: 0;
+    pointer-events: none; transition: opacity 0.2s, transform 0.2s; z-index: 50; font-weight: 500; }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  @media (prefers-reduced-motion: reduce) { .toast { transition: none; } }
+</style>
+</head>
+<body>
+<main class="app">
+  <h1>Stopwatch Video</h1>
+  <p class="sub">A video of a stopwatch counting up from 00:00. Pop it out to keep it floating over other apps. The numbers turn red at the time you choose.</p>
+
+  <section class="stage" id="stage" aria-label="Stopwatch video">
+    <video id="screen" playsinline muted autoplay aria-label="Stopwatch. Tap to start or pause."></video>
+  </section>
+
+  <div class="dock">
+    <button class="btn primary" id="startBtn" type="button">Start</button>
+    <button class="btn" id="resetBtn" type="button">Reset</button>
+    <button class="btn" id="pipBtn" type="button">Pop out</button>
+    <button class="btn" id="fsBtn" type="button">Full screen</button>
+  </div>
+
+  <section class="box" aria-labelledby="h-red">
+    <div class="head">
+      <h2 id="h-red">Turn red at</h2>
+      <div class="row" style="gap:0.6rem; flex-wrap:nowrap;">
+        <span class="sep" id="redState">On</span>
+        <button type="button" class="switch" id="redSwitch" role="switch" aria-checked="true" aria-labelledby="h-red"></button>
+      </div>
+    </div>
+    <div class="row" id="redFields">
+      <input type="number" id="minIn" min="0" max="999" inputmode="numeric" aria-label="Minutes">
+      <span class="sep">min</span>
+      <input type="number" id="secIn" min="0" max="59" inputmode="numeric" aria-label="Seconds">
+      <span class="sep">sec</span>
+    </div>
+    <p class="hint">It keeps counting after this point. Switch it off to keep the numbers white.</p>
+  </section>
+
+  <p class="note" id="support"></p>
+</main>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const screenEl = $('screen'), stage = $('stage'), startBtn = $('startBtn'), pipBtn = $('pipBtn');
+
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem('stopwatch:' + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+    set(k, v) { try { localStorage.setItem('stopwatch:' + k, JSON.stringify(v)); } catch (e) {} }
+  };
+  const st = { redOn: store.get('redOn', true), min: store.get('min', 5), sec: store.get('sec', 0), running: false, acc: 0, t0: 0 };
+
+  let toastTimer = null;
+  function toast(msg) {
+    const el = $('toast'); el.textContent = msg; el.classList.add('show');
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('show'), 4200);
+  }
+
+  const limit = () => (Number(st.min) || 0) * 60 + (Number(st.sec) || 0);
+  const elapsed = () => st.acc + (st.running ? (performance.now() - st.t0) / 1000 : 0);
+  const isOver = () => st.redOn && limit() > 0 && Math.floor(elapsed()) >= limit();
+  function fmt(t) {
+    t = Math.max(0, Math.floor(t));
+    const h = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60), s = t % 60;
+    const p = (n) => String(n).padStart(2, '0');
+    return h > 0 ? `${h}:${p(m)}:${p(s)}` : `${m}:${p(s)}`;
+  }
+
+  /* ---------- the stopwatch picture, drawn on a canvas and turned into a video ---------- */
+  const canvas = document.createElement('canvas');
+  canvas.width = 1280; canvas.height = 720;
+  const ctx = canvas.getContext('2d');
+
+  function draw() {
+    const W = canvas.width, H = canvas.height;
+    ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+    const text = fmt(elapsed());
+    let size = Math.round(H * 0.52);
+    const font = (s) => `600 ${s}px "Barlow Condensed", "Arial Narrow", Arial, sans-serif`;
+    ctx.font = font(size);
+    // fixed-width digit cells so the numbers never jiggle
+    const dW = ctx.measureText('0').width, cW = ctx.measureText(':').width;
+    const widthOf = () => [...text].reduce((a, ch) => a + (ch === ':' ? cW : dW), 0);
+    const maxW = W * 0.92;
+    if (widthOf() > maxW) { size = Math.floor(size * maxW / widthOf()); ctx.font = font(size); }
+    const d = ctx.measureText('0').width, c = ctx.measureText(':').width;
+    const total = [...text].reduce((a, ch) => a + (ch === ':' ? c : d), 0);
+    ctx.fillStyle = isOver() ? '#FF4D3F' : '#FFFFFF';
+    ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
+    let x = (W - total) / 2;
+    for (const ch of text) {
+      const w = ch === ':' ? c : d;
+      ctx.fillText(ch, x + w / 2, H / 2 + size * 0.04);
+      x += w;
+    }
+  }
+
+  // A worker clock keeps the picture updating when this tab is in the background or popped out.
+  function makeTicker(fn, ms) {
+    let timer = null;
+    const fallback = () => { clearInterval(timer); timer = setInterval(fn, ms); };
+    try {
+      const src = `setInterval(function(){postMessage(0)},${ms})`;
+      const w = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
+      w.onmessage = fn; w.onerror = fallback;
+    } catch (e) { fallback(); }
+  }
+
+  const canStream = !!canvas.captureStream;
+  if (canStream) {
+    draw();
+    screenEl.srcObject = canvas.captureStream(30);
+    screenEl.play().catch(() => {});
+  } else {
+    toast('This browser can\u2019t make the stopwatch video.');
+  }
+  makeTicker(draw, 33);
+  if (document.fonts && document.fonts.load) document.fonts.load('600 100px "Barlow Condensed"').then(draw).catch(() => {});
+
+  /* ---------- start / pause / reset ---------- */
+  function toggleRun() {
+    if (st.running) { st.acc = elapsed(); st.running = false; }
+    else { st.t0 = performance.now(); st.running = true; }
+    refresh();
+  }
+  function reset() { st.acc = 0; st.running = false; refresh(); draw(); }
+  function refresh() {
+    startBtn.textContent = st.running ? 'Pause' : (st.acc > 0 ? 'Resume' : 'Start');
+    if ('mediaSession' in navigator) { try { navigator.mediaSession.playbackState = st.running ? 'playing' : 'paused'; } catch (e) {} }
+  }
+  startBtn.addEventListener('click', toggleRun);
+  $('resetBtn').addEventListener('click', reset);
+  screenEl.addEventListener('click', toggleRun);
+
+  if ('mediaSession' in navigator) {
+    const set = (a, f) => { try { navigator.mediaSession.setActionHandler(a, f); } catch (e) {} };
+    set('play', () => { if (!st.running) toggleRun(); });
+    set('pause', () => { if (st.running) toggleRun(); });
+    try { navigator.mediaSession.metadata = new MediaMetadata({ title: 'Stopwatch' }); } catch (e) {}
+  }
+
+  /* ---------- pop out (picture in picture) ---------- */
+  const stdPip = !!(document.pictureInPictureEnabled && screenEl.requestPictureInPicture);
+  const webkitPip = typeof screenEl.webkitSetPresentationMode === 'function';
+  const pipActive = () => document.pictureInPictureElement === screenEl || screenEl.webkitPresentationMode === 'picture-in-picture';
+  const syncPipBtn = () => { pipBtn.classList.toggle('on', pipActive()); pipBtn.textContent = pipActive() ? 'Close pop out' : 'Pop out'; };
+
+  async function togglePip() {
+    try {
+      if (pipActive()) {
+        if (document.pictureInPictureElement) await document.exitPictureInPicture();
+        else screenEl.webkitSetPresentationMode('inline');
+        return;
+      }
+      if (screenEl.paused) await screenEl.play().catch(() => {});
+      if (screenEl.readyState < 1) {
+        await new Promise((res) => { screenEl.addEventListener('loadedmetadata', res, { once: true }); setTimeout(res, 1500); });
+      }
+      if (stdPip) await screenEl.requestPictureInPicture();
+      else if (webkitPip) screenEl.webkitSetPresentationMode('picture-in-picture');
+      else toast('This browser doesn\u2019t offer pop out. Use full screen instead.');
+    } catch (e) {
+      toast('Pop out didn\u2019t start. Try tapping Pop out again.');
+    }
+  }
+  pipBtn.addEventListener('click', togglePip);
+  screenEl.addEventListener('enterpictureinpicture', syncPipBtn);
+  screenEl.addEventListener('leavepictureinpicture', syncPipBtn);
+  screenEl.addEventListener('webkitpresentationmodechanged', syncPipBtn);
+  // The pop-out window's own play/pause button starts and stops the stopwatch.
+  screenEl.addEventListener('pause', () => {
+    if (!canStream) return;
+    if (pipActive()) { toggleRun(); setTimeout(() => screenEl.play().catch(() => {}), 50); }
+    else setTimeout(() => screenEl.play().catch(() => {}), 50);
+  });
+
+  /* ---------- full screen ---------- */
+  function toggleFs() {
+    const fsEl = document.fullscreenElement || document.webkitFullscreenElement;
+    if (fsEl) { (document.exitFullscreen || document.webkitExitFullscreen).call(document); return; }
+    if (stage.requestFullscreen) stage.requestFullscreen().catch(() => {});
+    else if (stage.webkitRequestFullscreen) stage.webkitRequestFullscreen();
+    else if (screenEl.webkitEnterFullscreen) screenEl.webkitEnterFullscreen();
+    else toast('Full screen isn\u2019t available in this browser.');
+  }
+  $('fsBtn').addEventListener('click', toggleFs);
+
+  /* ---------- settings ---------- */
+  const minIn = $('minIn'), secIn = $('secIn');
+  minIn.value = st.min; secIn.value = st.sec;
+  const sw = $('redSwitch'), redFields = $('redFields');
+  function applySwitch() {
+    sw.setAttribute('aria-checked', String(st.redOn));
+    $('redState').textContent = st.redOn ? 'On' : 'Off';
+    redFields.classList.toggle('off', !st.redOn);
+    minIn.disabled = secIn.disabled = !st.redOn;
+  }
+  sw.addEventListener('click', () => { st.redOn = !st.redOn; store.set('redOn', st.redOn); applySwitch(); draw(); });
+  applySwitch();
+  function readLimit() {
+    st.min = Math.max(0, Math.min(999, parseInt(minIn.value, 10) || 0));
+    st.sec = Math.max(0, Math.min(59, parseInt(secIn.value, 10) || 0));
+    store.set('min', st.min); store.set('sec', st.sec);
+  }
+  minIn.addEventListener('input', readLimit); secIn.addEventListener('input', readLimit);
+  minIn.addEventListener('blur', () => { readLimit(); minIn.value = st.min; });
+  secIn.addEventListener('blur', () => { readLimit(); secIn.value = st.sec; });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.target.closest && e.target.closest('input')) return;
+    if (e.key === ' ') { if (e.target.tagName === 'BUTTON') return; e.preventDefault(); toggleRun(); }
+    else if (e.key === 'r') reset();
+    else if (e.key === 'p') togglePip();
+    else if (e.key === 'f') toggleFs();
+  });
+
+  refresh(); syncPipBtn();
+  $('support').textContent = (canStream && (stdPip || webkitPip))
+    ? 'Tap the stopwatch to start or pause. Pop out keeps it floating over other apps. Keep this page open while it runs.'
+    : 'This browser doesn\u2019t offer pop out for web pages. The stopwatch still works here and in full screen. Chrome or Edge on Windows and Safari on iPad support pop out.';
+})();
+</script>
+</body>
+</html>
