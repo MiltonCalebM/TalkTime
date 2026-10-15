@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Stopwatch Video</title>
+<title>Talk Timer</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600&display=swap" rel="stylesheet">
@@ -83,8 +83,8 @@
 </head>
 <body>
 <main class="app">
-  <h1>Stopwatch Video</h1>
-  <p class="sub">A video of a stopwatch counting up from 00:00. Pop it out to keep it floating over other apps. The numbers turn red at the time you choose.</p>
+  <h1>Talk Timer</h1>
+  <p class="sub">Timer that floats over other apps. The numbers turn red at the time you choose.</p>
 
   <section class="stage" id="stage" aria-label="Stopwatch video">
     <video id="screen" playsinline muted autoplay aria-label="Stopwatch. Tap to start or pause."></video>
@@ -99,15 +99,19 @@
 
   <section class="box" aria-labelledby="h-red">
     <div class="head">
-      <h2 id="h-red">Turn red at</h2>
+      <h2 id="h-red">Alert Time (Red Text)</h2>
       <div class="row" style="gap:0.6rem; flex-wrap:nowrap;">
         <span class="sep" id="redState">On</span>
         <button type="button" class="switch" id="redSwitch" role="switch" aria-checked="true" aria-labelledby="h-red"></button>
       </div>
     </div>
     <div class="row" id="redFields">
-      <input type="number" id="minIn" min="0" max="999" inputmode="numeric" aria-label="Minutes">
+      <input type="number" id="hourIn" min="0" max="99" inputmode="numeric" aria-label="Hours">
+      <span class="sep">hr</span>
+    
+      <input type="number" id="minIn" min="0" max="59" inputmode="numeric" aria-label="Minutes">
       <span class="sep">min</span>
+    
       <input type="number" id="secIn" min="0" max="59" inputmode="numeric" aria-label="Seconds">
       <span class="sep">sec</span>
     </div>
@@ -127,7 +131,16 @@
     get(k, d) { try { const v = localStorage.getItem('stopwatch:' + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
     set(k, v) { try { localStorage.setItem('stopwatch:' + k, JSON.stringify(v)); } catch (e) {} }
   };
-  const st = { redOn: store.get('redOn', true), min: store.get('min', 5), sec: store.get('sec', 0), running: false, acc: 0, t0: 0 };
+  const st = {
+  redOn: store.get('redOn', true),
+  hour: store.get('hour', 0),
+  min: store.get('min', 5),
+  sec: store.get('sec', 0),
+  running: false,
+  acc: 0,
+  t0: 0
+};
+
 
   let toastTimer = null;
   function toast(msg) {
@@ -135,7 +148,10 @@
     clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('show'), 4200);
   }
 
-  const limit = () => (Number(st.min) || 0) * 60 + (Number(st.sec) || 0);
+  const limit = () =>
+  (Number(st.hour) || 0) * 3600 +
+  (Number(st.min) || 0) * 60 +
+  (Number(st.sec) || 0);
   const elapsed = () => st.acc + (st.running ? (performance.now() - st.t0) / 1000 : 0);
   const isOver = () => st.redOn && limit() > 0 && Math.floor(elapsed()) >= limit();
   function fmt(t) {
@@ -265,25 +281,52 @@
   $('fsBtn').addEventListener('click', toggleFs);
 
   /* ---------- settings ---------- */
-  const minIn = $('minIn'), secIn = $('secIn');
+  const hourIn = $('hourIn'),
+      minIn = $('minIn'),
+      secIn = $('secIn');
+
+hourIn.value = st.hour;
+minIn.value = st.min;
+secIn.value = st.sec;
   minIn.value = st.min; secIn.value = st.sec;
   const sw = $('redSwitch'), redFields = $('redFields');
   function applySwitch() {
     sw.setAttribute('aria-checked', String(st.redOn));
     $('redState').textContent = st.redOn ? 'On' : 'Off';
     redFields.classList.toggle('off', !st.redOn);
-    minIn.disabled = secIn.disabled = !st.redOn;
+    hourIn.disabled =
+minIn.disabled =
+secIn.disabled = !st.redOn;
   }
   sw.addEventListener('click', () => { st.redOn = !st.redOn; store.set('redOn', st.redOn); applySwitch(); draw(); });
   applySwitch();
-  function readLimit() {
-    st.min = Math.max(0, Math.min(999, parseInt(minIn.value, 10) || 0));
-    st.sec = Math.max(0, Math.min(59, parseInt(secIn.value, 10) || 0));
-    store.set('min', st.min); store.set('sec', st.sec);
-  }
-  minIn.addEventListener('input', readLimit); secIn.addEventListener('input', readLimit);
-  minIn.addEventListener('blur', () => { readLimit(); minIn.value = st.min; });
-  secIn.addEventListener('blur', () => { readLimit(); secIn.value = st.sec; });
+function readLimit() {
+  st.hour = Math.max(0, Math.min(99, parseInt(hourIn.value, 10) || 0));
+  st.min = Math.max(0, Math.min(59, parseInt(minIn.value, 10) || 0));
+  st.sec = Math.max(0, Math.min(59, parseInt(secIn.value, 10) || 0));
+
+  store.set('hour', st.hour);
+  store.set('min', st.min);
+  store.set('sec', st.sec);
+}
+hourIn.addEventListener('input', readLimit);
+minIn.addEventListener('input', readLimit);
+secIn.addEventListener('input', readLimit);
+
+hourIn.addEventListener('blur', () => {
+  readLimit();
+  hourIn.value = st.hour;
+});
+
+minIn.addEventListener('blur', () => {
+  readLimit();
+  minIn.value = st.min;
+});
+
+secIn.addEventListener('blur', () => {
+  readLimit();
+  secIn.value = st.sec;
+});
 
   document.addEventListener('keydown', (e) => {
     if (e.target.closest && e.target.closest('input')) return;
